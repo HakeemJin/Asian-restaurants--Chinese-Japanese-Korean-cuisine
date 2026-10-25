@@ -1,6 +1,6 @@
  Los Angeles Cuisine Explorer
 
-SSCI 591 — Web GIS | Project 3
+SSCI 591 — Web GIS | Project 3 | Haokang Jin
 
 1. What This Map Shows
 

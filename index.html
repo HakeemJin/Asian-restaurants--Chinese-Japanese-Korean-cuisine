@@ -1,0 +1,446 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1" />
+
+  <title>Taste of Asia | Los Angeles Cuisine Explorer</title>
+
+  <!-- ArcGIS Maps SDK for JavaScript 5.1 -->
+  <script type="module" src="https://js.arcgis.com/5.1/"></script>
+
+  
+<style>
+  html, body {
+    margin: 0;
+    min-height: 100%;
+    font-family: Arial, sans-serif;
+    background: #f4f7fa;
+    color: #172a3e;
+  }
+
+  /* Page Header */
+  .page-header {
+    background: #172a3e;
+    color: white;
+    padding: 26px 5%;
+  }
+
+  .header-content {
+    max-width: 1300px;
+    margin: auto;
+  }
+
+  .eyebrow {
+    color: #84d6bb;
+    font-size: 12px;
+    letter-spacing: 2px;
+    font-weight: bold;
+  }
+
+  h1 {
+    font-size: 36px;
+    margin: 8px 0;
+  }
+
+  .subtitle {
+    color: #dee8f1;
+    margin: 0;
+    font-size: 16px;
+  }
+
+  /* About Section */
+  .about-section {
+    max-width: 1300px;
+    margin: 0 auto;
+    padding: 18px 5%;
+    line-height: 1.6;
+  }
+
+  .about-section h2 {
+    font-size: 19px;
+    margin: 0 0 8px;
+  }
+
+  .about-section p {
+    font-size: 14px;
+    margin: 0;
+  }
+
+  .about-section a {
+    color: #087f91;
+  }
+
+  /* Map Container */
+  .map-section {
+    position: relative;
+    margin: 0 3%;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 3px 14px #0002;
+  }
+
+  arcgis-map {
+    display: block;
+    width: 100%;
+    height: 68vh;
+    min-height: 430px;
+  }
+
+  /* API Status */
+  #status {
+    position: absolute;
+    bottom: 16px;
+    left: 16px;
+    z-index: 10;
+    padding: 10px 14px;
+    background: white;
+    border-radius: 7px;
+    box-shadow: 0 2px 10px #0002;
+    font-size: 13px;
+    max-width: 330px;
+  }
+
+  /* Cuisine Legend */
+  .cuisine-legend {
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    padding: 18px;
+    font-size: 14px;
+    flex-wrap: wrap;
+  }
+
+  .cuisine-legend span {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .dot {
+    display: inline-block;
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    border: 1px solid white;
+  }
+
+  .chinese {
+    background: #e14d43;
+  }
+
+  .japanese {
+    background: #437fcb;
+  }
+
+  .korean {
+    background: #3a9d6f;
+  }
+
+  /* Responsive Layout */
+  @media (max-width: 600px) {
+    h1 {
+      font-size: 28px;
+    }
+
+    .page-header {
+      padding: 20px 5%;
+    }
+
+    arcgis-map {
+      height: 65vh;
+      min-height: 380px;
+    }
+
+    .cuisine-legend {
+      gap: 14px;
+    }
+  }
+</style>
+
+</head>
+
+
+<body>
+
+  <!-- Page header -->
+  <header class="page-header">
+    <div class="header-content">
+      <p class="eyebrow">SSCI 591 | WEB GIS PROJECT 3</p>
+
+      <h1>Taste of Asia</h1>
+
+      <p class="subtitle">
+        Exploring Chinese, Japanese & Korean Restaurants
+        in Los Angeles
+      </p>
+    </div>
+  </header>
+
+  <!-- About section -->
+  <section class="about-section">
+    <h2>About This Map</h2>
+
+    <p>
+      This interactive map explores the distribution of
+      Chinese, Japanese, and Korean restaurants across
+      central Los Angeles.
+      Restaurant locations and cuisine information are
+      retrieved from
+      <a href="https://www.openstreetmap.org/"
+         target="_blank" rel="noopener noreferrer">OpenStreetMap</a>
+      through the
+      <a href="https://wiki.openstreetmap.org/wiki/Overpass_API"
+         target="_blank" rel="noopener noreferrer">Overpass API</a>.
+      Starting from Esri's
+      <a href="https://developers.arcgis.com/javascript/latest/sample-code/get-started-graphics/"
+         target="_blank" rel="noopener noreferrer">Intro to Graphics sample</a>,
+      I customized the map's location, basemap, symbols,
+      and popup information.
+      Users can click restaurant markers to explore
+      attributes and use the Layer List to toggle the
+      three cuisine categories.
+    </p>
+  </section>
+
+  <!-- Map section -->
+  <main class="map-section">
+
+    <arcgis-map
+      basemap="streets-vector"
+      center="-118.30,34.05"
+      zoom="11">
+
+      <arcgis-popup slot="popup"></arcgis-popup>
+      <arcgis-zoom slot="top-left"></arcgis-zoom>
+
+      <arcgis-layer-list slot="top-right"></arcgis-layer-list>
+
+    </arcgis-map>
+
+    <div id="status">Loading restaurant data...</div>
+
+  </main>
+
+  <!-- Cuisine color legend -->
+  <div class="cuisine-legend">
+    <span><i class="dot chinese"></i>Chinese</span>
+    <span><i class="dot japanese"></i>Japanese</span>
+    <span><i class="dot korean"></i>Korean</span>
+  </div>
+
+  <script type="module">
+
+    // 1. Import ArcGIS SDK classes
+    const [Graphic, GraphicsLayer] = await $arcgis.import([
+      "@arcgis/core/Graphic.js",
+      "@arcgis/core/layers/GraphicsLayer.js"
+    ]);
+
+    const viewElement =
+      document.querySelector("arcgis-map");
+
+    const statusElement =
+      document.querySelector("#status");
+
+    await viewElement.viewOnReady();
+
+    // 2. Define cuisine categories and colors
+    const cuisineConfig = {
+      chinese: {
+        title: "Chinese Restaurants",
+        color: [225, 77, 67]
+      },
+      japanese: {
+        title: "Japanese Restaurants",
+        color: [67, 127, 203]
+      },
+      korean: {
+        title: "Korean Restaurants",
+        color: [58, 157, 111]
+      }
+    };
+
+    // 3. Create three separate GraphicsLayers
+    const layers = {};
+
+    for (const [key, config] of Object.entries(cuisineConfig)) {
+      layers[key] = new GraphicsLayer({
+        title: config.title
+      });
+
+      viewElement.map.add(layers[key]);
+    }
+
+    // 4. Overpass API query
+    // Bounding box: south, west, north, east
+    const query = `
+      [out:json][timeout:60];
+      (
+        nwr["amenity"="restaurant"]
+        ["cuisine"~"chinese|japanese|korean",i]
+        (33.90,-118.45,34.15,-118.15);
+      );
+      out center;
+    `;
+
+   const apiUrl =
+  "https://overpass-api.de/api/interpreter";
+
+    // 5. Fetch restaurant data
+    async function loadRestaurants() {
+      try {
+        const response = await fetch(apiUrl, {
+          method: "POST",
+          body: new URLSearchParams({
+            data: query
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(
+            `HTTP error: ${response.status}`
+          );
+        }
+
+        const data = await response.json();
+
+        const counts = {
+          chinese: 0,
+          japanese: 0,
+          korean: 0
+        };
+
+        // 6. Process API results
+        for (const element of data.elements) {
+
+          const tags = element.tags || {};
+
+          // Node coordinates or Way/Relation center
+          const latitude =
+            element.lat ?? element.center?.lat;
+
+          const longitude =
+            element.lon ?? element.center?.lon;
+
+          if (
+            !Number.isFinite(latitude) ||
+            !Number.isFinite(longitude)
+          ) {
+            continue;
+          }
+
+          // Normalize cuisine tags
+          const cuisineTags = (tags.cuisine || "")
+            .toLowerCase()
+            .split(/[;,]/)
+            .map(value => value.trim());
+
+          // Choose one primary category
+          const category = [
+            "chinese",
+            "japanese",
+            "korean"
+          ].find(type => cuisineTags.includes(type));
+
+          if (!category) {
+            continue;
+          }
+
+          const config = cuisineConfig[category];
+
+          const name =
+            tags.name || "Unnamed Restaurant";
+
+          const address = [
+            tags["addr:housenumber"],
+            tags["addr:street"]
+          ].filter(Boolean).join(" ");
+
+          // 7. Create an ArcGIS Graphic
+          const restaurantGraphic = new Graphic({
+            geometry: {
+              type: "point",
+              longitude: longitude,
+              latitude: latitude
+            },
+
+            symbol: {
+              type: "simple-marker",
+              style: "circle",
+              color: config.color,
+              size: 9,
+              outline: {
+                color: [255, 255, 255],
+                width: 1
+              }
+            },
+
+            attributes: {
+              Name: name,
+              Cuisine: tags.cuisine || category,
+              Category: config.title,
+              Address: address || "Not available",
+              OSM_ID: `${element.type}/${element.id}`
+            },
+
+            popupTemplate: {
+              title: "{Name}",
+              content: [{
+                type: "fields",
+                fieldInfos: [
+                  {
+                    fieldName: "Cuisine",
+                    label: "Cuisine"
+                  },
+                  {
+                    fieldName: "Address",
+                    label: "Address"
+                  },
+                  {
+                    fieldName: "OSM_ID",
+                    label: "OpenStreetMap ID"
+                  }
+                ]
+              }]
+            }
+          });
+
+          // 8. Add Graphic to its cuisine layer
+          layers[category].add(restaurantGraphic);
+
+          counts[category]++;
+        }
+
+        const total =
+          counts.chinese +
+          counts.japanese +
+          counts.korean;
+
+        // 9. Show loading results
+        statusElement.textContent =
+          `Loaded ${total} restaurants | ` +
+          `Chinese: ${counts.chinese} | ` +
+          `Japanese: ${counts.japanese} | ` +
+          `Korean: ${counts.korean}`;
+
+        console.log("Restaurant counts:", counts);
+
+      } catch (error) {
+        console.error("Overpass API error:", error);
+
+        statusElement.textContent =
+          "Failed to load restaurant data. " +
+          "Check the browser console and try reloading.";
+      }
+    }
+
+    // Start API request
+    loadRestaurants();
+
+  </script>
+
+</body>
+</html>
